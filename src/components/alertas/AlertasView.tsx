@@ -148,12 +148,12 @@ export function AlertasView({
   return (
     <div className="space-y-6">
       {/* Status filter tabs */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
         {statusButtons.map(({ key, label, count, icon: Icon, color }) => (
           <button
             key={key}
             onClick={() => setStatusFilter(key)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap shrink-0 ${
               statusFilter === key
                 ? 'bg-primary/10 border-primary/30 text-primary shadow-sm shadow-primary/10'
                 : 'bg-card/50 border-border/40 text-muted-foreground hover:border-border/60 hover:text-foreground'
@@ -173,7 +173,7 @@ export function AlertasView({
       </div>
 
       {/* Curso filter pills */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
         <Filter className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <button
           onClick={() => setCursoFilter('todos')}

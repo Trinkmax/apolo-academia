@@ -47,8 +47,8 @@ export default async function CursoDetallePage(props: { params: Promise<{ id: st
         <Link href="/cursos" className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 mb-4 transition-colors w-fit">
           <ChevronLeft className="w-3.5 h-3.5" /> Volver a cursos
         </Link>
-        <h1 className="text-3xl font-bold tracking-tight">{curso.nombre}</h1>
-        <div className="flex items-center gap-4 mt-2">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{curso.nombre}</h1>
+        <div className="flex items-center gap-3 sm:gap-4 mt-2 flex-wrap">
           <span className="text-xs text-muted-foreground flex items-center gap-1.5">
             <Calendar className="w-3 h-3 text-primary" />
             {curso.fecha_inicio} - {curso.fecha_fin}
@@ -66,7 +66,7 @@ export default async function CursoDetallePage(props: { params: Promise<{ id: st
       </div>
 
       <Card className="glass border-border/40 shadow-lg shadow-black/10">
-        <CardContent className="p-6">
+        <CardContent className="p-3 sm:p-6 overflow-x-auto">
           <AttendanceGrid
             cursoId={curso.id}
             inscripciones={inscripciones || []}

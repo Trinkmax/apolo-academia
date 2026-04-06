@@ -70,7 +70,7 @@ export default async function TesoreriaPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-3xl font-bold tracking-tight">Tesoreria</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Tesoreria</h1>
           <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md">El Semaforo</span>
         </div>
         <p className="text-muted-foreground text-sm">Control visual del estado financiero de cada alumno inscripto.</p>
@@ -101,9 +101,9 @@ export default async function TesoreriaPage() {
       </div>
 
       {/* Revenue summary bar */}
-      <div className="flex items-center justify-between px-5 py-3.5 rounded-xl glass border-border/40">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-5 py-3.5 rounded-xl glass border-border/40">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <DollarSign className="w-4 h-4 text-primary" />
           </div>
           <div>
@@ -111,20 +111,22 @@ export default async function TesoreriaPage() {
             <p className="text-lg font-bold text-foreground tabular-nums">${totalRecaudado.toLocaleString('es-AR')}</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Pactado total</p>
-          <p className="text-lg font-bold text-muted-foreground tabular-nums">${totalPactado.toLocaleString('es-AR')}</p>
-        </div>
-        <div className="hidden md:block">
-          <div className="progress-bar w-32">
-            <div
-              className="progress-bar-fill bg-primary"
-              style={{ width: `${totalPactado > 0 ? Math.min((totalRecaudado / totalPactado) * 100, 100) : 0}%` }}
-            />
+        <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="text-left sm:text-right">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Pactado total</p>
+            <p className="text-lg font-bold text-muted-foreground tabular-nums">${totalPactado.toLocaleString('es-AR')}</p>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1 text-center tabular-nums">
-            {totalPactado > 0 ? Math.round((totalRecaudado / totalPactado) * 100) : 0}% cobrado
-          </p>
+          <div>
+            <div className="progress-bar w-24 sm:w-32">
+              <div
+                className="progress-bar-fill bg-primary"
+                style={{ width: `${totalPactado > 0 ? Math.min((totalRecaudado / totalPactado) * 100, 100) : 0}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1 text-center tabular-nums">
+              {totalPactado > 0 ? Math.round((totalRecaudado / totalPactado) * 100) : 0}% cobrado
+            </p>
+          </div>
         </div>
       </div>
 
@@ -171,7 +173,7 @@ export default async function TesoreriaPage() {
           }
 
           return (
-            <div key={ins.id} className={`p-5 rounded-xl border ${borderColor} ${bgGradient} glass transition-all hover:shadow-md hover:shadow-black/5 hover:-translate-y-px flex flex-col md:flex-row items-start md:items-center justify-between gap-4`}>
+            <div key={ins.id} className={`p-4 sm:p-5 rounded-xl border ${borderColor} ${bgGradient} glass transition-all hover:shadow-md hover:shadow-black/5 hover:-translate-y-px flex flex-col md:flex-row items-start md:items-center justify-between gap-3 sm:gap-4`}>
               {/* Student info */}
               <div className="flex items-center gap-3.5 flex-1 min-w-0">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${

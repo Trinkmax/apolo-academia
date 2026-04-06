@@ -164,7 +164,7 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
         </div>
 
         {/* Filters */}
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {filters.map(f => (
             <button
               key={f.key}
@@ -346,7 +346,7 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
           {filtered.map(t => (
             <div
               key={t.id}
-              className="flex items-center gap-4 px-4 py-3 rounded-xl border transition-all"
+              className="flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl border transition-all"
               style={{ background: 'hsl(var(--card))', borderColor: 'hsl(var(--border) / 0.5)' }}
             >
               {/* Avatar */}

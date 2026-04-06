@@ -51,7 +51,7 @@ export default async function AlumnosPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Alumnos e Inscripciones</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Alumnos e Inscripciones</h1>
           <p className="text-muted-foreground mt-1.5 text-sm">Alta de alumnos, inscripciones y estado de pagos.</p>
           <div className="header-accent mt-4 w-24" />
         </div>
@@ -59,7 +59,7 @@ export default async function AlumnosPage() {
       </div>
 
       {/* Mini stats */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-verde/5 border border-verde/15">
           <CheckCircle2 className="w-4 h-4 text-verde" />
           <div>
@@ -96,11 +96,11 @@ export default async function AlumnosPage() {
           <table className="w-full text-sm text-left">
             <thead>
               <tr className="border-b border-border/50" style={{ background: 'hsl(var(--surface-2) / 0.5)' }}>
-                <th className="px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alumno</th>
-                <th className="px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Curso</th>
-                <th className="px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Contacto</th>
-                <th className="px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Estado</th>
-                <th className="px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Abonado / Total</th>
+                <th className="px-4 sm:px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Alumno</th>
+                <th className="px-4 sm:px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hidden md:table-cell">Curso</th>
+                <th className="px-4 sm:px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right hidden lg:table-cell">Contacto</th>
+                <th className="px-4 sm:px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Estado</th>
+                <th className="px-4 sm:px-6 py-3.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">Abonado / Total</th>
               </tr>
             </thead>
             <tbody>
@@ -128,7 +128,7 @@ export default async function AlumnosPage() {
 
                   return (
                     <tr key={ins.id} className="table-row-hover border-b border-border/30 last:border-0">
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${avatarColor}`}>
                             {alumno?.nombre_completo?.charAt(0)?.toUpperCase()}
@@ -142,25 +142,29 @@ export default async function AlumnosPage() {
                                 {alumno.talleres_realizados} talleres
                               </p>
                             )}
+                            <p className="text-[10px] text-muted-foreground md:hidden flex items-center gap-1 mt-0.5">
+                              <GraduationCap className="w-3 h-3 text-primary/60" />
+                              {curso?.nombre}
+                            </p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-6 py-4 hidden md:table-cell">
                         <div className="flex items-center gap-1.5 text-muted-foreground text-[13px]">
                           <GraduationCap className="w-3.5 h-3.5 text-primary/60" />
                           {curso?.nombre}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 sm:px-6 py-4 text-right hidden lg:table-cell">
                         <div className="flex items-center justify-end gap-1.5 text-muted-foreground text-[13px]">
                           <Phone className="w-3 h-3" />
                           {alumno?.telefono}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 sm:px-6 py-4">
                         {getStatusBadge(ins.estado_pago)}
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-4 sm:px-6 py-4 text-right">
                         <div className="flex flex-col items-end gap-1.5">
                           <div className="text-[13px]">
                             <span className="font-semibold text-foreground">${totalAbonado.toLocaleString('es-AR')}</span>

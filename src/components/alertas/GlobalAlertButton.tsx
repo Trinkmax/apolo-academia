@@ -54,7 +54,7 @@ export function GlobalAlertButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-105 transition-all flex items-center justify-center group"
+        className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-40 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-105 transition-all flex items-center justify-center group"
         title="Nueva alerta rapida (Ctrl+J)"
       >
         <BellPlus className="w-5 h-5 group-hover:scale-110 transition-transform" />

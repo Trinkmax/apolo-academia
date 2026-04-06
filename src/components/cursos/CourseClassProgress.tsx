@@ -110,7 +110,7 @@ export function CourseClassProgress({
   if (currentDates.length === 0) return null
 
   return (
-    <div className="px-5 py-3">
+    <div className="px-3 sm:px-5 py-3">
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-[10px] font-semibold flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground">
           <BookOpen className="w-3 h-3 text-primary" />

@@ -186,8 +186,8 @@ export function AlertTemplateManager({ plantillas: initialPlantillas }: AlertTem
             .sort((a, b) => a.orden - b.orden)
             .map((p) => (
             <Card key={p.id} className={`glass card-hover transition-opacity ${!p.activa ? 'opacity-50' : ''}`}>
-              <CardContent className="p-4 flex items-center gap-4">
-                <GripVertical className="w-4 h-4 text-muted-foreground/30 shrink-0" />
+              <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-4">
+                <GripVertical className="w-4 h-4 text-muted-foreground/30 shrink-0 hidden sm:block" />
 
                 <div className={`w-2 h-8 rounded-full shrink-0 ${
                   p.color_etiqueta === 'naranja' ? 'bg-naranja' : p.color_etiqueta === 'rojo' ? 'bg-rojo' : 'bg-azul'
@@ -195,7 +195,7 @@ export function AlertTemplateManager({ plantillas: initialPlantillas }: AlertTem
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{p.descripcion_template}</p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${COLOR_CLASSES[p.color_etiqueta] || COLOR_CLASSES.azul}`}>
                       {COLOR_LABELS[p.color_etiqueta] || p.color_etiqueta}
                     </span>
@@ -212,7 +212,7 @@ export function AlertTemplateManager({ plantillas: initialPlantillas }: AlertTem
 
                 <button
                   onClick={() => openEdit(p)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground shrink-0"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
@@ -220,7 +220,7 @@ export function AlertTemplateManager({ plantillas: initialPlantillas }: AlertTem
                 <button
                   onClick={() => handleDelete(p.id)}
                   disabled={deleting === p.id}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-rojo/10 transition-colors text-muted-foreground hover:text-rojo"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-rojo/10 transition-colors text-muted-foreground hover:text-rojo shrink-0"
                 >
                   {deleting === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                 </button>

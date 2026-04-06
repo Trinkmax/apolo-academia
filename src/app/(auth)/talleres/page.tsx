@@ -37,7 +37,7 @@ export default async function TalleresPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Talleres de Practica</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Talleres de Practica</h1>
         <p className="text-muted-foreground mt-1.5 text-sm">Gestiona talleres, marca asistencia y pagos.</p>
         <div className="header-accent mt-4 w-24" />
       </div>

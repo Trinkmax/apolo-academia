@@ -84,7 +84,7 @@ export default async function AlertasPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Centro de Alertas</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Centro de Alertas</h1>
           <p className="text-muted-foreground mt-1.5 text-sm">Tareas del dia, recordatorios y mensajeria CRM integrada.</p>
           <div className="header-accent mt-4 w-24" />
         </div>

@@ -82,7 +82,7 @@ export function AlertList({ alertas, alumnos, cursos, cursoAlumnosMap, alumnoCon
         key={a.id}
         className={`rounded-xl border border-border/40 ${accent.bg} border-l-[3px] ${accent.border} ${a.completada ? 'opacity-50' : ''} transition-all hover:border-border/60 group`}
       >
-        <div className="p-4 flex items-start gap-3.5">
+        <div className="p-3 sm:p-4 flex items-start gap-2.5 sm:gap-3.5">
           <AlertCompleteButton id={a.id} completada={a.completada} />
 
           <button
@@ -93,7 +93,7 @@ export function AlertList({ alertas, alumnos, cursos, cursoAlumnosMap, alumnoCon
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <h3 className={`font-semibold text-[15px] leading-snug ${a.completada ? 'line-through text-muted-foreground' : 'text-foreground group-hover:text-primary transition-colors'}`}>
+                <h3 className={`font-semibold text-[13px] sm:text-[15px] leading-snug ${a.completada ? 'line-through text-muted-foreground' : 'text-foreground group-hover:text-primary transition-colors'}`}>
                   {a.descripcion}
                 </h3>
 

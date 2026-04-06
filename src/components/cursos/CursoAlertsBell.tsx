@@ -106,7 +106,7 @@ export function CursoAlertsBell({ cursoId, cursoNombre, pendingCount }: CursoAle
           )}
         </button>
       </SheetTrigger>
-      <SheetContent className="w-[400px] sm:w-[440px] glass border-border/50 flex flex-col">
+      <SheetContent className="w-[calc(100vw-3rem)] sm:w-[400px] md:w-[440px] glass border-border/50 flex flex-col">
         <SheetHeader className="pb-4 border-b border-border/30">
           <SheetTitle className="text-base">Alertas - {cursoNombre}</SheetTitle>
           <SheetDescription className="text-xs">

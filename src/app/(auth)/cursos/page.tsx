@@ -51,7 +51,7 @@ export default async function CursosPage() {
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestion de Cursos</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Gestion de Cursos</h1>
           <p className="text-muted-foreground mt-1.5 text-sm">Administra cohortes, inscriptos y enlaces de WhatsApp.</p>
           <div className="header-accent mt-4 w-24" />
         </div>
@@ -150,7 +150,7 @@ export default async function CursosPage() {
                   </div>
 
                   {/* Alumnos section */}
-                  <div className="p-5 flex-1 flex flex-col border-t border-border/30">
+                  <div className="p-3 sm:p-5 flex-1 flex flex-col border-t border-border/30">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-xs font-semibold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
                         <Users className="w-3.5 h-3.5 text-primary" />
