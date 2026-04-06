@@ -36,18 +36,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { MessageCircle, Check, UserPlus, Loader2, AlertTriangle, Users } from 'lucide-react'
-
-type CursoConCupo = Curso & { inscriptos: number }
+import { MessageCircle, Check, UserPlus, Loader2 } from 'lucide-react'
 
 const formSchema = z.object({
   nombre_completo: z.string().min(2, 'Obligatorio'),
   telefono: z.string().min(6, 'Debe ser un numero valido (ej. +549...)'),
   curso_id: z.string().min(1, 'Selecciona un curso'),
   monto_pactado: z.coerce.number().min(0, 'Monto invalido'),
+  monto_sena: z.coerce.number().min(0, 'Monto invalido'),
 })
 
-export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], cursoCupoMap?: Record<string, number> }) {
+export function CreateSaleForm({ cursos }: { cursos: Curso[] }) {
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [saleComplete, setSaleComplete] = useState<{
@@ -55,6 +54,7 @@ export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], curs
     nombre: string;
     waLink: string;
     cursoNombre: string;
+    pagoSena: boolean;
   } | null>(null)
 
   const router = useRouter()
@@ -66,23 +66,14 @@ export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], curs
       nombre_completo: '',
       telefono: '',
       curso_id: '',
-      monto_pactado: 70000,
+      monto_pactado: 85000,
+      monto_sena: 0,
     },
   })
 
-  const selectedCursoId = form.watch('curso_id')
-  const selectedCurso = useMemo(() => cursos.find(c => c.id === selectedCursoId), [cursos, selectedCursoId])
-  const inscriptos = cursoCupoMap?.[selectedCursoId] || 0
-  const cupoMax = selectedCurso?.cupo_maximo || 10
-  const cupoLleno = inscriptos >= cupoMax
+  const montoSena = form.watch('monto_sena')
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    // Validate cupo
-    if (cupoLleno) {
-      toast.error('Cupo lleno', { description: `Este curso ya tiene ${inscriptos}/${cupoMax} alumnos.` })
-      return
-    }
-
     setSubmitting(true)
     try {
       // Check if alumno already exists by phone
@@ -120,29 +111,69 @@ export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], curs
         return
       }
 
-      const { error: insErr } = await supabase
+      const pagoSena = values.monto_sena > 0
+      const estadoInicial = pagoSena ? 'SEÑADO' : 'PENDIENTE'
+
+      const { data: inscripcion, error: insErr } = await supabase
         .from('curso_inscripciones')
         .insert([{
           alumno_id: alumnoId,
           curso_id: values.curso_id,
           monto_pactado: values.monto_pactado,
-          estado_pago: 'SEÑADO',
+          estado_pago: estadoInicial,
         }])
+        .select('id')
+        .single()
 
       if (insErr) throw insErr
 
+      // Si pago seña, registrar pago + movimiento de caja
+      if (pagoSena) {
+        const { data: pago, error: pagoErr } = await supabase
+          .from('pagos')
+          .insert([{
+            inscripcion_id: inscripcion.id,
+            monto: values.monto_sena,
+            tipo: 'SEÑA',
+            fecha_pago: new Date().toISOString().split('T')[0],
+          }])
+          .select('id')
+          .single()
+
+        if (pagoErr) throw pagoErr
+
+        // Registrar movimiento de caja (reporte)
+        const curso = cursos.find(c => c.id === values.curso_id)
+        await supabase.from('movimientos_caja').insert([{
+          tipo: 'INGRESO',
+          concepto: `Seña inscripcion - ${values.nombre_completo} - ${curso?.nombre}`,
+          monto: values.monto_sena,
+          alumno_id: alumnoId,
+          curso_id: values.curso_id,
+          inscripcion_id: inscripcion.id,
+          pago_id: pago.id,
+        }])
+      }
+
       const curso = cursos.find(c => c.id === values.curso_id)
 
-      toast.success('Inscripcion registrada - Estado: SEÑADO', {
-        description: 'Debe abonar $70.000 en la Clase 1 para pasar a AL DIA.',
-      })
+      if (pagoSena) {
+        toast.success(`Inscripcion registrada - Estado: SEÑADO`, {
+          description: `Seña de $${values.monto_sena.toLocaleString('es-AR')} registrada. Resta $${(values.monto_pactado - values.monto_sena).toLocaleString('es-AR')}.`,
+        })
+      } else {
+        toast.success(`Inscripcion registrada - Estado: PENDIENTE`, {
+          description: `Monto total pactado: $${values.monto_pactado.toLocaleString('es-AR')}. Sin pago inicial.`,
+        })
+      }
 
-      form.reset({ nombre_completo: '', telefono: '', curso_id: '', monto_pactado: 70000 })
+      form.reset({ nombre_completo: '', telefono: '', curso_id: '', monto_pactado: 85000, monto_sena: 0 })
       setSaleComplete({
         telefono: values.telefono,
         nombre: values.nombre_completo,
         waLink: curso!.whatsapp_link,
         cursoNombre: curso!.nombre,
+        pagoSena,
       })
       router.refresh()
 
@@ -168,11 +199,9 @@ export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], curs
       setOpen(val);
       if (!val) setSaleComplete(null);
     }}>
-      <DialogTrigger asChild>
-        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold h-9 text-xs shadow-lg shadow-primary/15">
-          <UserPlus className="w-3.5 h-3.5 mr-1.5" />
-          Inscribir Alumno
-        </Button>
+      <DialogTrigger render={<Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold h-9 text-xs shadow-lg shadow-primary/15" />}>
+        <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+        Inscribir Alumno
       </DialogTrigger>
       <DialogContent className="sm:max-w-[460px] glass border-border/50">
         {saleComplete ? (
@@ -182,7 +211,12 @@ export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], curs
             </div>
             <DialogTitle className="text-xl">Inscripcion Exitosa</DialogTitle>
             <DialogDescription className="text-sm text-foreground/70 pb-2 max-w-sm">
-              <strong className="text-foreground">{saleComplete.nombre}</strong> quedo inscripto con estado <span className="text-amarillo font-semibold">SEÑADO</span>. Enviale el link del grupo.
+              <strong className="text-foreground">{saleComplete.nombre}</strong> quedo inscripto con estado{' '}
+              {saleComplete.pagoSena ? (
+                <span className="text-amarillo font-semibold">SEÑADO</span>
+              ) : (
+                <span className="text-blue-400 font-semibold">PENDIENTE</span>
+              )}. Enviale el link del grupo.
             </DialogDescription>
             <Button
               onClick={handleWaLink}
@@ -197,7 +231,7 @@ export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], curs
             <DialogHeader>
               <DialogTitle className="text-lg">Nueva Inscripcion</DialogTitle>
               <DialogDescription className="text-xs">
-                El alumno inicia como SEÑADO ($15.000 inscripcion). Pasa a AL DIA al pagar la cuota completa ($70.000) en Clase 1.
+                Monto total por defecto: $85.000. La seña es opcional — si el alumno no paga ahora, queda como PENDIENTE.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -240,22 +274,20 @@ export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], curs
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger className="bg-input/30 h-10 text-sm">
-                              <SelectValue placeholder="Elegir curso" />
+                              <SelectValue placeholder="Elegir curso">
+                                {(value: string) => {
+                                  const c = cursos.find(curso => curso.id === value)
+                                  return c?.nombre || 'Elegir curso'
+                                }}
+                              </SelectValue>
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {cursos.map(c => {
-                              const ins = cursoCupoMap?.[c.id] || 0
-                              const max = c.cupo_maximo || 10
-                              const full = ins >= max
-                              return (
-                                <SelectItem key={c.id} value={c.id} disabled={full}>
-                                  <span className={full ? 'text-muted-foreground' : ''}>
-                                    {c.nombre} ({ins}/{max})
-                                  </span>
-                                </SelectItem>
-                              )
-                            })}
+                            {cursos.map(c => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.nombre}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -277,25 +309,27 @@ export function CreateSaleForm({ cursos, cursoCupoMap }: { cursos: Curso[], curs
                   />
                 </div>
 
-                {/* Cupo warning */}
-                {selectedCursoId && cupoLleno && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-rojo/10 border border-rojo/20 text-rojo text-xs font-medium">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    Cupo lleno ({inscriptos}/{cupoMax}). No se puede inscribir.
-                  </div>
-                )}
-
-                {selectedCursoId && !cupoLleno && inscriptos > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/15 text-xs text-muted-foreground">
-                    <Users className="w-3.5 h-3.5 text-primary" />
-                    <span>{inscriptos}/{cupoMax} inscriptos - Quedan <strong className="text-foreground">{cupoMax - inscriptos}</strong> lugares</span>
-                  </div>
-                )}
+                <FormField
+                  control={form.control}
+                  name="monto_sena"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-medium">Seña Inicial ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0 = sin pago ahora" className="bg-input/30 h-10 text-sm text-right tabular-nums" {...field} />
+                      </FormControl>
+                      <FormDescription className="text-[11px]">
+                        Opcional. Si paga seña (ej. $15.000) queda como SEÑADO. Si no paga, queda PENDIENTE.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <DialogFooter className="pt-3">
-                  <Button type="submit" disabled={submitting || cupoLleno} className="w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/15 disabled:opacity-40">
+                  <Button type="submit" disabled={submitting} className="w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/15 disabled:opacity-40">
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Inscribir (Señado $15.000)
+                    {montoSena > 0 ? `Inscribir (Seña $${Number(montoSena).toLocaleString('es-AR')})` : 'Inscribir (Sin pago)'}
                   </Button>
                 </DialogFooter>
               </form>

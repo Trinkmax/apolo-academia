@@ -12,6 +12,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      alerta_plantillas_defecto: {
+        Row: {
+          id: string
+          descripcion_template: string
+          offset_dias: number
+          anchor: string
+          color_etiqueta: string
+          activa: boolean | null
+          orden: number
+          creado_en: string | null
+        }
+        Insert: {
+          id?: string
+          descripcion_template: string
+          offset_dias?: number
+          anchor?: string
+          color_etiqueta?: string
+          activa?: boolean | null
+          orden?: number
+          creado_en?: string | null
+        }
+        Update: {
+          id?: string
+          descripcion_template?: string
+          offset_dias?: number
+          anchor?: string
+          color_etiqueta?: string
+          activa?: boolean | null
+          orden?: number
+          creado_en?: string | null
+        }
+        Relationships: []
+      }
       alertas: {
         Row: {
           color_etiqueta: string
@@ -20,6 +53,7 @@ export type Database = {
           descripcion: string
           fecha_vencimiento: string
           id: string
+          origen: string
           referencia_id: string
           tipo: string
         }
@@ -30,6 +64,7 @@ export type Database = {
           descripcion: string
           fecha_vencimiento: string
           id?: string
+          origen?: string
           referencia_id: string
           tipo: string
         }
@@ -40,6 +75,7 @@ export type Database = {
           descripcion?: string
           fecha_vencimiento?: string
           id?: string
+          origen?: string
           referencia_id?: string
           tipo?: string
         }
@@ -185,7 +221,6 @@ export type Database = {
           id: string
           nombre: string
           whatsapp_link: string
-          cupo_maximo: number
           clase_dates: string[] | null
           clases_completadas: boolean[] | null
         }
@@ -198,7 +233,6 @@ export type Database = {
           id?: string
           nombre: string
           whatsapp_link: string
-          cupo_maximo?: number
           clase_dates?: string[]
           clases_completadas?: boolean[]
         }
@@ -211,11 +245,81 @@ export type Database = {
           id?: string
           nombre?: string
           whatsapp_link?: string
-          cupo_maximo?: number
           clase_dates?: string[]
           clases_completadas?: boolean[]
         }
         Relationships: []
+      }
+      movimientos_caja: {
+        Row: {
+          id: string
+          tipo: string
+          concepto: string
+          monto: number
+          alumno_id: string | null
+          curso_id: string | null
+          inscripcion_id: string | null
+          pago_id: string | null
+          fecha: string
+          notas: string | null
+          creado_en: string | null
+        }
+        Insert: {
+          id?: string
+          tipo: string
+          concepto: string
+          monto: number
+          alumno_id?: string | null
+          curso_id?: string | null
+          inscripcion_id?: string | null
+          pago_id?: string | null
+          fecha?: string
+          notas?: string | null
+          creado_en?: string | null
+        }
+        Update: {
+          id?: string
+          tipo?: string
+          concepto?: string
+          monto?: number
+          alumno_id?: string | null
+          curso_id?: string | null
+          inscripcion_id?: string | null
+          pago_id?: string | null
+          fecha?: string
+          notas?: string | null
+          creado_en?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_caja_alumno_id_fkey"
+            columns: ["alumno_id"]
+            isOneToOne: false
+            referencedRelation: "alumnos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_caja_curso_id_fkey"
+            columns: ["curso_id"]
+            isOneToOne: false
+            referencedRelation: "cursos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_caja_inscripcion_id_fkey"
+            columns: ["inscripcion_id"]
+            isOneToOne: false
+            referencedRelation: "curso_inscripciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_caja_pago_id_fkey"
+            columns: ["pago_id"]
+            isOneToOne: false
+            referencedRelation: "pagos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mensaje_plantillas: {
         Row: {
@@ -359,6 +463,8 @@ export type Database = {
           asistio: boolean
           notas: string | null
           creado_en: string | null
+          metodo_pago: string
+          cuenta_destino: string | null
         }
         Insert: {
           id?: string
@@ -368,6 +474,8 @@ export type Database = {
           asistio?: boolean
           notas?: string | null
           creado_en?: string | null
+          metodo_pago?: string
+          cuenta_destino?: string | null
         }
         Update: {
           id?: string
@@ -377,6 +485,8 @@ export type Database = {
           asistio?: boolean
           notas?: string | null
           creado_en?: string | null
+          metodo_pago?: string
+          cuenta_destino?: string | null
         }
         Relationships: [
           {
@@ -533,10 +643,12 @@ export type Inscripcion = Database['public']['Tables']['curso_inscripciones']['R
 export type Asistencia = Database['public']['Tables']['asistencias']['Row']
 export type Pago = Database['public']['Tables']['pagos']['Row']
 export type Alerta = Database['public']['Tables']['alertas']['Row']
+export type AlertaPlantillaDefecto = Database['public']['Tables']['alerta_plantillas_defecto']['Row']
 export type ComunicacionChecklist = Database['public']['Tables']['curso_comunicaciones_checklist']['Row']
 export type MensajePlantilla = Database['public']['Tables']['mensaje_plantillas']['Row']
 export type MensajeEnviado = Database['public']['Tables']['mensajes_enviados']['Row']
 export type TallerPractica = Database['public']['Tables']['talleres_practica']['Row']
+export type MovimientoCaja = Database['public']['Tables']['movimientos_caja']['Row']
 
 export type InscripcionConDetalles = Inscripcion & {
   alumnos: Alumno

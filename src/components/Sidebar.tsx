@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import Image from 'next/image'
 import {
   LayoutDashboard,
   BookOpen,
@@ -10,7 +11,9 @@ import {
   Bell,
   Scissors,
   ChevronRight,
+  LogOut,
 } from 'lucide-react'
+import { logout } from '@/app/(login)/login/actions'
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, description: 'Vista general' },
@@ -34,11 +37,15 @@ export default function Sidebar() {
     >
       {/* Logo */}
       <div className="px-5 pt-6 pb-5 flex items-center gap-3.5">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center gold-glow shrink-0"
-          style={{ background: 'linear-gradient(135deg, hsl(38 92% 56%), hsl(28 90% 48%))' }}
-        >
-          <Scissors className="w-5 h-5 text-black" />
+        <div className="w-11 h-11 rounded-full overflow-hidden shrink-0 ring-2 ring-primary/30">
+          <Image
+            src="/logo-apolo.jpg"
+            alt="Apolo by Monaco"
+            width={44}
+            height={44}
+            className="object-cover w-full h-full"
+            priority
+          />
         </div>
         <div className="flex flex-col">
           <span className="text-[15px] font-bold tracking-widest" style={{ color: 'hsl(var(--primary))' }}>
@@ -97,6 +104,15 @@ export default function Sidebar() {
               Apolo Academia
             </p>
           </div>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              title="Cerrar sesion"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </form>
         </div>
       </div>
     </aside>

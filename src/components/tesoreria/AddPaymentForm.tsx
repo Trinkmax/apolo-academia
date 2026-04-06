@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DollarSign, Loader2, Banknote } from 'lucide-react'
 
-export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado }: { inscripcionId: string, montoPactado: number, totalAbonado: number }) {
+export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado, alumnoId, cursoId, alumnoNombre, cursoNombre }: { inscripcionId: string, montoPactado: number, totalAbonado: number, alumnoId?: string, cursoId?: string, alumnoNombre?: string, cursoNombre?: string }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [monto, setMonto] = useState<string>('')
@@ -38,7 +38,7 @@ export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado }: { 
 
     setLoading(true)
     try {
-      const { error: pagoErr } = await supabase
+      const { data: pago, error: pagoErr } = await supabase
         .from('pagos')
         .insert([{
           inscripcion_id: inscripcionId,
@@ -46,8 +46,22 @@ export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado }: { 
           tipo: tipo,
           fecha_pago: new Date().toISOString().split('T')[0]
         }])
+        .select('id')
+        .single()
 
       if (pagoErr) throw pagoErr
+
+      // Registrar movimiento de caja (reporte)
+      const conceptoTipo = tipo === 'SEÑA' ? 'Seña' : tipo === 'TOTAL' ? 'Pago completo' : 'Cuota/Parcial'
+      await supabase.from('movimientos_caja').insert([{
+        tipo: 'INGRESO',
+        concepto: `${conceptoTipo} - ${alumnoNombre || 'Alumno'} - ${cursoNombre || 'Curso'}`,
+        monto: Number(monto),
+        alumno_id: alumnoId || null,
+        curso_id: cursoId || null,
+        inscripcion_id: inscripcionId,
+        pago_id: pago.id,
+      }])
 
       const nuevoTotal = totalAbonado + Number(monto)
       const nuevoEstado = nuevoTotal >= montoPactado ? 'AL_DIA' : 'PENDIENTE'
@@ -72,11 +86,9 @@ export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado }: { 
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="border-primary/30 text-foreground hover:bg-primary/10 hover:border-primary/50 h-9 text-xs font-semibold transition-all">
-          <Banknote className="w-3.5 h-3.5 mr-1.5" />
-          Cobrar
-        </Button>
+      <DialogTrigger render={<Button size="sm" variant="outline" className="border-primary/30 text-foreground hover:bg-primary/10 hover:border-primary/50 h-9 text-xs font-semibold transition-all" />}>
+        <Banknote className="w-3.5 h-3.5 mr-1.5" />
+        Cobrar
       </DialogTrigger>
       <DialogContent className="sm:max-w-[400px] glass border-border/50">
         <DialogHeader>

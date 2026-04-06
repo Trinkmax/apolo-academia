@@ -41,7 +41,7 @@ export default async function TesoreriaPage() {
       bgClass: 'stat-card-verde',
       borderClass: 'border-verde/20',
       iconBg: 'bg-verde/10',
-      subtitle: 'Cuota completa $70k',
+      subtitle: 'Cuota completa abonada',
     },
     {
       label: 'Senados',
@@ -51,7 +51,7 @@ export default async function TesoreriaPage() {
       bgClass: 'stat-card-amarillo',
       borderClass: 'border-amarillo/20',
       iconBg: 'bg-amarillo/10',
-      subtitle: 'Inscripcion $15k - Debe cuota',
+      subtitle: 'Pago seña - Debe resto',
     },
     {
       label: 'Deudores',
@@ -230,6 +230,10 @@ export default async function TesoreriaPage() {
                       inscripcionId={ins.id}
                       montoPactado={montoPactado}
                       totalAbonado={totalAbonado}
+                      alumnoId={ins.alumno_id}
+                      cursoId={ins.curso_id}
+                      alumnoNombre={alumno?.nombre_completo}
+                      cursoNombre={curso?.nombre}
                     />
                   ) : (
                     <div className="w-9 h-9 rounded-xl bg-verde/10 flex items-center justify-center border border-verde/20">

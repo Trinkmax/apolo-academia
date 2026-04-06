@@ -94,6 +94,15 @@ export function AlumnoProfileDialog({
 
   // Taller form
   const [tallerLoading, setTallerLoading] = useState(false)
+  const [showTallerForm, setShowTallerForm] = useState(false)
+  const [tallerCount, setTallerCount] = useState(1)
+  const [tallerPagado, setTallerPagado] = useState(true)
+  const [tallerMetodo, setTallerMetodo] = useState('efectivo')
+  const [tallerCuenta, setTallerCuenta] = useState('')
+  // For inline payment method selection when toggling a taller to paid
+  const [payingTallerId, setPayingTallerId] = useState<string | null>(null)
+  const [payingTallerMetodo, setPayingTallerMetodo] = useState('efectivo')
+  const [payingTallerCuenta, setPayingTallerCuenta] = useState('')
 
   // Asistencia toggle loading
   const [asisLoading, setAsisLoading] = useState<string | null>(null)
@@ -224,25 +233,34 @@ export function AlumnoProfileDialog({
   }
 
   // --- TALLERES ---
-  async function agregarTaller(pagado: boolean) {
+  async function agregarTalleres() {
+    if (tallerCount < 1) return
     setTallerLoading(true)
     try {
-      const { data, error } = await supabase.from('talleres_practica').insert({
+      const rows = Array.from({ length: tallerCount }, () => ({
         alumno_id: alumnoId,
-        pagado,
+        pagado: tallerPagado,
         asistio: false,
         fecha: new Date().toISOString().split('T')[0],
-      }).select().single()
+        metodo_pago: tallerPagado ? tallerMetodo : 'efectivo',
+        cuenta_destino: tallerPagado && tallerMetodo === 'transferencia' && tallerCuenta.trim() ? tallerCuenta.trim() : null,
+      }))
 
+      const { data, error } = await supabase.from('talleres_practica').insert(rows).select()
       if (error) throw error
 
       if (data) {
-        setTalleres(prev => [...prev, data])
-        toast.success(pagado ? 'Taller pagado agregado' : 'Taller pendiente agregado')
+        setTalleres(prev => [...prev, ...data])
+        toast.success(`${tallerCount} taller${tallerCount > 1 ? 'es' : ''} agregado${tallerCount > 1 ? 's' : ''}`)
       }
+      setTallerCount(1)
+      setTallerPagado(true)
+      setTallerMetodo('efectivo')
+      setTallerCuenta('')
+      setShowTallerForm(false)
       router.refresh()
     } catch (err: any) {
-      toast.error('Error al agregar taller', { description: err.message })
+      toast.error('Error al agregar talleres', { description: err.message })
     } finally {
       setTallerLoading(false)
     }
@@ -267,12 +285,42 @@ export function AlumnoProfileDialog({
   }
 
   async function toggleTallerPagado(tallerId: string, currentPagado: boolean) {
-    const { error } = await supabase.from('talleres_practica').update({ pagado: !currentPagado }).eq('id', tallerId)
+    if (currentPagado) {
+      // Toggling to unpaid - just flip
+      const { error } = await supabase.from('talleres_practica').update({ pagado: false }).eq('id', tallerId)
+      if (error) {
+        toast.error('Error al actualizar pago', { description: error.message })
+        return
+      }
+      setTalleres(prev => prev.map(t => t.id === tallerId ? { ...t, pagado: false } : t))
+      setPayingTallerId(null)
+      router.refresh()
+    } else {
+      // Toggling to paid - show payment method selector
+      setPayingTallerId(tallerId)
+      setPayingTallerMetodo('efectivo')
+      setPayingTallerCuenta('')
+    }
+  }
+
+  async function confirmarPagoTaller() {
+    if (!payingTallerId) return
+    const updateData: any = {
+      pagado: true,
+      metodo_pago: payingTallerMetodo,
+    }
+    if (payingTallerMetodo === 'transferencia' && payingTallerCuenta.trim()) {
+      updateData.cuenta_destino = payingTallerCuenta.trim()
+    } else {
+      updateData.cuenta_destino = null
+    }
+    const { error } = await supabase.from('talleres_practica').update(updateData).eq('id', payingTallerId)
     if (error) {
       toast.error('Error al actualizar pago', { description: error.message })
       return
     }
-    setTalleres(prev => prev.map(t => t.id === tallerId ? { ...t, pagado: !currentPagado } : t))
+    setTalleres(prev => prev.map(t => t.id === payingTallerId ? { ...t, ...updateData } : t))
+    setPayingTallerId(null)
     router.refresh()
   }
 
@@ -655,124 +703,263 @@ export function AlumnoProfileDialog({
 
             {/* === TALLERES DE PRACTICA === */}
             <div>
-              <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
-                <Scissors className="w-3 h-3 text-primary" />
-                Talleres de practica
-              </h3>
-
-              {/* Agregar taller - botones grandes */}
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <button
-                  onClick={() => agregarTaller(true)}
-                  disabled={tallerLoading}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed transition-all hover:opacity-80"
-                  style={{
-                    borderColor: 'hsl(var(--verde) / 0.3)',
-                    background: 'hsl(var(--verde) / 0.05)',
-                    color: 'hsl(var(--verde))',
-                  }}
-                >
-                  {tallerLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Banknote className="w-4 h-4" />
-                      <span className="text-xs font-semibold">+ Taller Pagado</span>
-                    </>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Scissors className="w-3 h-3 text-primary" />
+                  Talleres de practica
+                  {talleres.length > 0 && (
+                    <span className="text-[9px] font-normal ml-1">
+                      Asistidos: <span style={{ color: 'hsl(var(--verde))' }}>{talleresAsistidos}/{talleres.length}</span>
+                      {' | '}
+                      Pagados: <span style={{ color: 'hsl(var(--primary))' }}>{talleresPagados}/{talleres.length}</span>
+                    </span>
                   )}
-                </button>
+                </h3>
                 <button
-                  onClick={() => agregarTaller(false)}
-                  disabled={tallerLoading}
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed transition-all hover:opacity-80"
-                  style={{
-                    borderColor: 'hsl(var(--border) / 0.5)',
-                    background: 'hsl(var(--card) / 0.3)',
-                    color: 'hsl(var(--muted-foreground))',
-                  }}
+                  onClick={() => setShowTallerForm(!showTallerForm)}
+                  className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md transition-colors"
+                  style={showTallerForm ? { color: 'hsl(var(--primary))', background: 'hsl(var(--primary) / 0.1)' } : { color: 'hsl(var(--muted-foreground))' }}
                 >
-                  {tallerLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Banknote className="w-4 h-4" />
-                      <span className="text-xs font-semibold">+ Taller Debe</span>
-                    </>
-                  )}
+                  <Plus className="w-2.5 h-2.5 inline mr-0.5" /> Agregar
                 </button>
               </div>
 
-              {talleres.length > 0 && (
-                <div className="space-y-3">
-                  {/* Asistencia row - scissors */}
-                  <div className="p-3 rounded-xl border" style={{ borderColor: 'hsl(var(--border) / 0.3)', background: 'hsl(var(--card) / 0.4)' }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <Scissors className="w-3.5 h-3.5" style={{ color: 'hsl(var(--verde))' }} />
-                        <span className="text-[11px] font-semibold">Asistencia</span>
-                      </div>
-                      <span className="text-[10px] font-bold tabular-nums" style={{ color: 'hsl(var(--verde))' }}>
-                        {talleresAsistidos}/{talleres.length}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {talleres.map((t, i) => (
-                        <button
-                          key={`asis-${t.id}`}
-                          onClick={() => toggleTallerAsistio(t.id, t.asistio)}
-                          title={`Taller ${i + 1} - ${t.asistio ? 'Asistio' : 'Click para marcar asistencia'} (${format(new Date(t.fecha + 'T12:00:00'), 'd MMM', { locale: es })})`}
-                          className="w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all hover:scale-110"
-                          style={t.asistio ? {
-                            background: 'hsl(var(--verde) / 0.15)',
-                            borderColor: 'hsl(var(--verde) / 0.4)',
-                            color: 'hsl(var(--verde))',
-                            boxShadow: '0 2px 8px hsl(var(--verde) / 0.15)',
-                          } : {
-                            background: 'hsl(var(--card) / 0.6)',
-                            borderColor: 'hsl(var(--border) / 0.3)',
-                            color: 'hsl(var(--muted-foreground) / 0.2)',
-                          }}
-                        >
-                          <Scissors className="w-5 h-5" />
-                        </button>
-                      ))}
+              {/* Add talleres form */}
+              {showTallerForm && (
+                <div className="space-y-2 mb-3 p-3 rounded-xl border" style={{ borderColor: 'hsl(var(--border) / 0.3)', background: 'hsl(var(--card) / 0.4)' }}>
+                  {/* Quantity selector */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-medium text-muted-foreground">Cantidad</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setTallerCount(c => Math.max(1, c - 1))}
+                        className="w-7 h-7 rounded-lg border flex items-center justify-center transition-all hover:opacity-80"
+                        style={{ borderColor: 'hsl(var(--border) / 0.4)', background: 'hsl(var(--card) / 0.6)' }}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-sm font-bold tabular-nums w-6 text-center">{tallerCount}</span>
+                      <button
+                        onClick={() => setTallerCount(c => Math.min(10, c + 1))}
+                        className="w-7 h-7 rounded-lg border flex items-center justify-center transition-all hover:opacity-80"
+                        style={{ borderColor: 'hsl(var(--border) / 0.4)', background: 'hsl(var(--card) / 0.6)' }}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Pagos row - bills */}
-                  <div className="p-3 rounded-xl border" style={{ borderColor: 'hsl(var(--border) / 0.3)', background: 'hsl(var(--card) / 0.4)' }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-1.5">
-                        <Banknote className="w-3.5 h-3.5" style={{ color: 'hsl(var(--primary))' }} />
-                        <span className="text-[11px] font-semibold">Pagos talleres</span>
-                      </div>
-                      <span className="text-[10px] font-bold tabular-nums" style={{ color: 'hsl(var(--primary))' }}>
-                        {talleresPagados}/{talleres.length}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {talleres.map((t, i) => (
-                        <button
-                          key={`pago-${t.id}`}
-                          onClick={() => toggleTallerPagado(t.id, t.pagado)}
-                          title={`Taller ${i + 1} - ${t.pagado ? 'Pagado' : 'Click para marcar pagado'} (${format(new Date(t.fecha + 'T12:00:00'), 'd MMM', { locale: es })})`}
-                          className="w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all hover:scale-110"
-                          style={t.pagado ? {
-                            background: 'hsl(var(--primary) / 0.15)',
-                            borderColor: 'hsl(var(--primary) / 0.4)',
-                            color: 'hsl(var(--primary))',
-                            boxShadow: '0 2px 8px hsl(var(--primary) / 0.15)',
-                          } : {
-                            background: 'hsl(var(--card) / 0.6)',
-                            borderColor: 'hsl(var(--border) / 0.3)',
-                            color: 'hsl(var(--muted-foreground) / 0.2)',
-                          }}
-                        >
-                          <Banknote className="w-5 h-5" />
-                        </button>
-                      ))}
-                    </div>
+                  {/* Paid/Unpaid toggle */}
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setTallerPagado(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[10px] font-medium transition-all"
+                      style={tallerPagado ? {
+                        background: 'hsl(var(--verde) / 0.1)',
+                        borderColor: 'hsl(var(--verde) / 0.3)',
+                        color: 'hsl(var(--verde))',
+                      } : {
+                        background: 'transparent',
+                        borderColor: 'hsl(var(--border) / 0.3)',
+                        color: 'hsl(var(--muted-foreground))',
+                      }}
+                    >
+                      <Check className="w-3 h-3" />
+                      Pagado
+                    </button>
+                    <button
+                      onClick={() => setTallerPagado(false)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[10px] font-medium transition-all"
+                      style={!tallerPagado ? {
+                        background: 'hsl(var(--amarillo) / 0.1)',
+                        borderColor: 'hsl(var(--amarillo) / 0.3)',
+                        color: 'hsl(var(--amarillo))',
+                      } : {
+                        background: 'transparent',
+                        borderColor: 'hsl(var(--border) / 0.3)',
+                        color: 'hsl(var(--muted-foreground))',
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                      Debe
+                    </button>
                   </div>
+
+                  {/* Payment method - only when pagado */}
+                  {tallerPagado && (
+                    <>
+                      <div className="flex gap-1">
+                        {(['efectivo', 'transferencia', 'tarjeta'] as const).map(m => {
+                          const Icon = METODO_ICONS[m]
+                          const isActive = tallerMetodo === m
+                          return (
+                            <button
+                              key={m}
+                              onClick={() => setTallerMetodo(m)}
+                              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[10px] font-medium transition-all"
+                              style={isActive ? {
+                                background: 'hsl(var(--primary) / 0.1)',
+                                borderColor: 'hsl(var(--primary) / 0.3)',
+                                color: 'hsl(var(--primary))',
+                              } : {
+                                background: 'transparent',
+                                borderColor: 'hsl(var(--border) / 0.3)',
+                                color: 'hsl(var(--muted-foreground))',
+                              }}
+                            >
+                              <Icon className="w-3 h-3" />
+                              {METODO_LABELS[m]}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {tallerMetodo === 'transferencia' && (
+                        <Input
+                          value={tallerCuenta}
+                          onChange={e => setTallerCuenta(e.target.value)}
+                          placeholder="Cuenta destino (ej: Mercado Pago, CBU...)"
+                          className="bg-input/30 h-8 text-xs"
+                        />
+                      )}
+                    </>
+                  )}
+
+                  <Button
+                    onClick={agregarTalleres}
+                    disabled={tallerLoading}
+                    className="h-8 w-full bg-primary text-primary-foreground text-[10px] font-semibold"
+                  >
+                    {tallerLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : `Agregar ${tallerCount} taller${tallerCount > 1 ? 'es' : ''}`}
+                  </Button>
+                </div>
+              )}
+
+              {/* Taller list - unified rows */}
+              {talleres.length > 0 && (
+                <div className="space-y-1 max-h-52 overflow-y-auto">
+                  {talleres.map((t, i) => {
+                    const MetodoIcon = METODO_ICONS[t.metodo_pago] || Wallet
+                    const isPayingThis = payingTallerId === t.id
+                    return (
+                      <div key={t.id}>
+                        <div
+                          className="flex items-center gap-2 px-2.5 py-2 rounded-lg border text-[10px] transition-all"
+                          style={{ background: 'hsl(var(--card) / 0.5)', borderColor: 'hsl(var(--border) / 0.3)' }}
+                        >
+                          {/* Taller number & date */}
+                          <div className="flex items-center gap-1.5 min-w-[60px]">
+                            <span className="text-[10px] font-bold text-muted-foreground">#{i + 1}</span>
+                            <span className="text-[9px] text-muted-foreground/60 tabular-nums">
+                              {format(new Date(t.fecha + 'T12:00:00'), 'd MMM', { locale: es })}
+                            </span>
+                          </div>
+
+                          <div className="flex-1" />
+
+                          {/* Asistencia toggle */}
+                          <button
+                            onClick={() => toggleTallerAsistio(t.id, t.asistio)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md border transition-all hover:scale-105"
+                            style={t.asistio ? {
+                              background: 'hsl(var(--verde) / 0.15)',
+                              borderColor: 'hsl(var(--verde) / 0.4)',
+                              color: 'hsl(var(--verde))',
+                            } : {
+                              background: 'transparent',
+                              borderColor: 'hsl(var(--border) / 0.3)',
+                              color: 'hsl(var(--muted-foreground) / 0.4)',
+                            }}
+                            title={t.asistio ? 'Asistio' : 'Marcar asistencia'}
+                          >
+                            <Scissors className="w-3 h-3" />
+                            <span className="text-[9px] font-medium">{t.asistio ? 'Asistio' : 'Ausente'}</span>
+                          </button>
+
+                          {/* Pagado toggle */}
+                          <button
+                            onClick={() => toggleTallerPagado(t.id, t.pagado)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md border transition-all hover:scale-105"
+                            style={t.pagado ? {
+                              background: 'hsl(var(--primary) / 0.15)',
+                              borderColor: 'hsl(var(--primary) / 0.4)',
+                              color: 'hsl(var(--primary))',
+                            } : {
+                              background: 'transparent',
+                              borderColor: 'hsl(var(--border) / 0.3)',
+                              color: 'hsl(var(--muted-foreground) / 0.4)',
+                            }}
+                            title={t.pagado ? `Pagado - ${METODO_LABELS[t.metodo_pago] || 'Efectivo'}` : 'Marcar como pagado'}
+                          >
+                            <Banknote className="w-3 h-3" />
+                            <span className="text-[9px] font-medium">{t.pagado ? 'Pagado' : 'Debe'}</span>
+                          </button>
+
+                          {/* Payment method badge - only when paid */}
+                          {t.pagado && (
+                            <span className="flex items-center gap-0.5 text-[8px] text-muted-foreground/60" title={t.cuenta_destino ? `${METODO_LABELS[t.metodo_pago]} (${t.cuenta_destino})` : METODO_LABELS[t.metodo_pago]}>
+                              <MetodoIcon className="w-2.5 h-2.5" />
+                              {t.cuenta_destino && <span>({t.cuenta_destino})</span>}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Inline payment method selector when marking as paid */}
+                        {isPayingThis && (
+                          <div className="ml-4 mt-1 mb-1 p-2 rounded-lg border space-y-1.5" style={{ borderColor: 'hsl(var(--primary) / 0.2)', background: 'hsl(var(--primary) / 0.03)' }}>
+                            <span className="text-[9px] font-semibold text-muted-foreground">Metodo de pago:</span>
+                            <div className="flex gap-1">
+                              {(['efectivo', 'transferencia', 'tarjeta'] as const).map(m => {
+                                const Icon = METODO_ICONS[m]
+                                const isActive = payingTallerMetodo === m
+                                return (
+                                  <button
+                                    key={m}
+                                    onClick={() => setPayingTallerMetodo(m)}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md border text-[9px] font-medium transition-all"
+                                    style={isActive ? {
+                                      background: 'hsl(var(--primary) / 0.1)',
+                                      borderColor: 'hsl(var(--primary) / 0.3)',
+                                      color: 'hsl(var(--primary))',
+                                    } : {
+                                      background: 'transparent',
+                                      borderColor: 'hsl(var(--border) / 0.3)',
+                                      color: 'hsl(var(--muted-foreground))',
+                                    }}
+                                  >
+                                    <Icon className="w-2.5 h-2.5" />
+                                    {METODO_LABELS[m]}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {payingTallerMetodo === 'transferencia' && (
+                              <Input
+                                value={payingTallerCuenta}
+                                onChange={e => setPayingTallerCuenta(e.target.value)}
+                                placeholder="Cuenta destino"
+                                className="bg-input/30 h-7 text-[10px]"
+                              />
+                            )}
+                            <div className="flex gap-1">
+                              <Button
+                                onClick={confirmarPagoTaller}
+                                className="h-6 flex-1 text-[9px] font-semibold bg-primary text-primary-foreground"
+                              >
+                                Confirmar
+                              </Button>
+                              <Button
+                                onClick={() => setPayingTallerId(null)}
+                                variant="ghost"
+                                className="h-6 text-[9px] px-2"
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

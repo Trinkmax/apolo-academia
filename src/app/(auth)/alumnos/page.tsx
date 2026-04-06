@@ -31,12 +31,6 @@ export default async function AlumnosPage() {
     console.error(error)
   }
 
-  // Build cupo map: curso_id -> count of inscripciones
-  const cursoCupoMap: Record<string, number> = {}
-  inscripciones?.forEach((ins: any) => {
-    cursoCupoMap[ins.curso_id] = (cursoCupoMap[ins.curso_id] || 0) + 1
-  })
-
   const alDia = inscripciones?.filter(i => i.estado_pago === 'AL_DIA').length || 0
   const senados = inscripciones?.filter(i => i.estado_pago === 'SEÑADO').length || 0
   const deudores = inscripciones?.filter(i => i.estado_pago === 'DEUDOR').length || 0
@@ -61,7 +55,7 @@ export default async function AlumnosPage() {
           <p className="text-muted-foreground mt-1.5 text-sm">Alta de alumnos, inscripciones y estado de pagos.</p>
           <div className="header-accent mt-4 w-24" />
         </div>
-        <CreateSaleForm cursos={cursos || []} cursoCupoMap={cursoCupoMap} />
+        <CreateSaleForm cursos={cursos || []} />
       </div>
 
       {/* Mini stats */}

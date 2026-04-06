@@ -7,22 +7,35 @@ import { Badge } from '@/components/ui/badge'
 import { differenceInDays, isPast, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Calendar, Clock, MessageCircle, CalendarDays, Users, BookOpen } from 'lucide-react'
-import Link from 'next/link'
+import { CursoAlertsBell } from '@/components/cursos/CursoAlertsBell'
 
 export default async function CursosPage() {
   const supabase = await createClient()
 
-  const { data: cursos, error } = await supabase
-    .from('cursos')
-    .select(`
-      *,
-      curso_inscripciones(
-        id,
-        estado_pago,
-        alumnos ( id, nombre_completo, telefono )
-      )
-    `)
-    .order('fecha_inicio', { ascending: true })
+  const [{ data: cursos, error }, { data: alertasPendientes }] = await Promise.all([
+    supabase
+      .from('cursos')
+      .select(`
+        *,
+        curso_inscripciones(
+          id,
+          estado_pago,
+          alumnos ( id, nombre_completo, telefono )
+        )
+      `)
+      .order('fecha_inicio', { ascending: true }),
+    supabase
+      .from('alertas')
+      .select('referencia_id')
+      .eq('tipo', 'curso')
+      .eq('completada', false),
+  ])
+
+  // Build alert count map
+  const alertCountMap: Record<string, number> = {}
+  alertasPendientes?.forEach((a: any) => {
+    alertCountMap[a.referencia_id] = (alertCountMap[a.referencia_id] || 0) + 1
+  })
 
   if (error) {
     console.error('Error fetching courses:', error)
@@ -67,9 +80,6 @@ export default async function CursosPage() {
 
             const inscripciones = curso.curso_inscripciones || []
             const totalAlumnos = inscripciones.length
-            const cupo = curso.cupo_maximo || 10
-            const cupoUsado = Math.round((totalAlumnos / cupo) * 100)
-            const cupoLleno = totalAlumnos >= cupo
 
             return (
               <Card key={curso.id} className={`glass card-hover overflow-hidden flex flex-col ${isCompleted ? 'opacity-60' : ''}`}>
@@ -95,12 +105,11 @@ export default async function CursosPage() {
                     </div>
 
                     <div className="flex gap-2 shrink-0">
-                      <Link
-                        href={`/cursos/${curso.id}`}
-                        className="h-8 px-3 bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-all text-xs font-semibold border border-primary/20 flex items-center gap-1.5 hover:shadow-sm hover:shadow-primary/10"
-                      >
-                        <Users className="w-3.5 h-3.5" /> Asistencia
-                      </Link>
+                      <CursoAlertsBell
+                        cursoId={curso.id}
+                        cursoNombre={curso.nombre}
+                        pendingCount={alertCountMap[curso.id] || 0}
+                      />
                       <a
                         href={curso.whatsapp_link}
                         target="_blank"
@@ -147,17 +156,9 @@ export default async function CursosPage() {
                         <Users className="w-3.5 h-3.5 text-primary" />
                         Alumnos inscriptos
                       </h4>
-                      <div className="flex items-center gap-2">
-                        <div className="progress-bar w-16">
-                          <div
-                            className={`progress-bar-fill ${cupoLleno ? 'bg-rojo' : cupoUsado > 70 ? 'bg-amarillo' : 'bg-primary'}`}
-                            style={{ width: `${Math.min(cupoUsado, 100)}%` }}
-                          />
-                        </div>
-                        <span className={`text-[10px] font-bold tabular-nums ${cupoLleno ? 'text-rojo' : 'text-primary'}`}>
-                          {totalAlumnos}/{cupo}
-                        </span>
-                      </div>
+                      <span className="text-[10px] font-bold tabular-nums text-primary">
+                        {totalAlumnos} inscriptos
+                      </span>
                     </div>
 
                     <CursoAlumnosList

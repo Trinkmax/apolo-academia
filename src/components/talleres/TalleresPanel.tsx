@@ -85,12 +85,17 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
     }
     setCreateLoading(true)
     try {
-      const { data, error } = await supabase.from('talleres_practica').insert({
+      const insertData: any = {
         alumno_id: selectedAlumnoId,
         pagado: createPagado,
         asistio: false,
         fecha: new Date().toISOString().split('T')[0],
-      }).select('*, alumnos(id, nombre_completo, telefono, talleres_realizados)').single()
+        metodo_pago: createPagado ? createMetodo : 'efectivo',
+      }
+      if (createPagado && createMetodo === 'transferencia' && createCuenta.trim()) {
+        insertData.cuenta_destino = createCuenta.trim()
+      }
+      const { data, error } = await supabase.from('talleres_practica').insert(insertData).select('*, alumnos(id, nombre_completo, telefono, talleres_realizados)').single()
 
       if (error) throw error
 
@@ -382,23 +387,34 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
               </button>
 
               {/* Pagado toggle */}
-              <button
-                onClick={() => togglePagado(t.id, t.pagado)}
-                className="w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all hover:scale-105"
-                title={t.pagado ? 'Pagado - click para desmarcar' : 'Click para marcar pagado'}
-                style={t.pagado ? {
-                  background: 'hsl(var(--primary) / 0.15)',
-                  borderColor: 'hsl(var(--primary) / 0.4)',
-                  color: 'hsl(var(--primary))',
-                  boxShadow: '0 2px 8px hsl(var(--primary) / 0.15)',
-                } : {
-                  background: 'hsl(var(--card) / 0.6)',
-                  borderColor: 'hsl(var(--border) / 0.3)',
-                  color: 'hsl(var(--muted-foreground) / 0.2)',
-                }}
-              >
-                <Banknote className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => togglePagado(t.id, t.pagado)}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all hover:scale-105"
+                  title={t.pagado ? 'Pagado - click para desmarcar' : 'Click para marcar pagado'}
+                  style={t.pagado ? {
+                    background: 'hsl(var(--primary) / 0.15)',
+                    borderColor: 'hsl(var(--primary) / 0.4)',
+                    color: 'hsl(var(--primary))',
+                    boxShadow: '0 2px 8px hsl(var(--primary) / 0.15)',
+                  } : {
+                    background: 'hsl(var(--card) / 0.6)',
+                    borderColor: 'hsl(var(--border) / 0.3)',
+                    color: 'hsl(var(--muted-foreground) / 0.2)',
+                  }}
+                >
+                  <Banknote className="w-5 h-5" />
+                </button>
+                {t.pagado && (() => {
+                  const MetodoIcon = METODO_ICONS[t.metodo_pago] || Wallet
+                  return (
+                    <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground/60" title={t.cuenta_destino ? `${METODO_LABELS[t.metodo_pago]} (${t.cuenta_destino})` : METODO_LABELS[t.metodo_pago]}>
+                      <MetodoIcon className="w-3 h-3" />
+                      <span>{METODO_LABELS[t.metodo_pago] || 'Efectivo'}</span>
+                    </span>
+                  )
+                })()}
+              </div>
             </div>
           ))}
         </div>
