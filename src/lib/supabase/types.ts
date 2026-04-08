@@ -12,6 +12,147 @@ export type Database = {
   }
   public: {
     Tables: {
+      categorias_gasto: {
+        Row: {
+          activa: boolean | null
+          color: string | null
+          creado_en: string | null
+          icono: string | null
+          id: string
+          nombre: string
+          orden: number | null
+          tipo: string
+        }
+        Insert: {
+          activa?: boolean | null
+          color?: string | null
+          creado_en?: string | null
+          icono?: string | null
+          id?: string
+          nombre: string
+          orden?: number | null
+          tipo: string
+        }
+        Update: {
+          activa?: boolean | null
+          color?: string | null
+          creado_en?: string | null
+          icono?: string | null
+          id?: string
+          nombre?: string
+          orden?: number | null
+          tipo?: string
+        }
+        Relationships: []
+      }
+      gastos: {
+        Row: {
+          categoria_id: string
+          comprobante_numero: string | null
+          concepto: string
+          creado_en: string | null
+          fecha: string
+          frecuencia: string | null
+          id: string
+          metodo_pago: string | null
+          monto: number
+          notas: string | null
+          recurrente: boolean | null
+          sesion_caja_id: string | null
+          tipo: string
+        }
+        Insert: {
+          categoria_id: string
+          comprobante_numero?: string | null
+          concepto: string
+          creado_en?: string | null
+          fecha?: string
+          frecuencia?: string | null
+          id?: string
+          metodo_pago?: string | null
+          monto: number
+          notas?: string | null
+          recurrente?: boolean | null
+          sesion_caja_id?: string | null
+          tipo: string
+        }
+        Update: {
+          categoria_id?: string
+          comprobante_numero?: string | null
+          concepto?: string
+          creado_en?: string | null
+          fecha?: string
+          frecuencia?: string | null
+          id?: string
+          metodo_pago?: string | null
+          monto?: number
+          notas?: string | null
+          recurrente?: boolean | null
+          sesion_caja_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gastos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias_gasto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gastos_sesion_caja_id_fkey"
+            columns: ["sesion_caja_id"]
+            isOneToOne: false
+            referencedRelation: "sesiones_caja"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sesiones_caja: {
+        Row: {
+          cerrado_por: string | null
+          creado_en: string | null
+          diferencia: number | null
+          estado: string
+          fecha_apertura: string
+          fecha_cierre: string | null
+          id: string
+          monto_cierre_esperado: number | null
+          monto_cierre_real: number | null
+          monto_inicial: number
+          notas_apertura: string | null
+          notas_cierre: string | null
+        }
+        Insert: {
+          cerrado_por?: string | null
+          creado_en?: string | null
+          diferencia?: number | null
+          estado?: string
+          fecha_apertura?: string
+          fecha_cierre?: string | null
+          id?: string
+          monto_cierre_esperado?: number | null
+          monto_cierre_real?: number | null
+          monto_inicial?: number
+          notas_apertura?: string | null
+          notas_cierre?: string | null
+        }
+        Update: {
+          cerrado_por?: string | null
+          creado_en?: string | null
+          diferencia?: number | null
+          estado?: string
+          fecha_apertura?: string
+          fecha_cierre?: string | null
+          id?: string
+          monto_cierre_esperado?: number | null
+          monto_cierre_real?: number | null
+          monto_inicial?: number
+          notas_apertura?: string | null
+          notas_cierre?: string | null
+        }
+        Relationships: []
+      }
       alerta_plantillas_defecto: {
         Row: {
           id: string
@@ -263,6 +404,10 @@ export type Database = {
           fecha: string
           notas: string | null
           creado_en: string | null
+          sesion_caja_id: string | null
+          categoria_id: string | null
+          gasto_id: string | null
+          metodo_pago: string | null
         }
         Insert: {
           id?: string
@@ -276,6 +421,10 @@ export type Database = {
           fecha?: string
           notas?: string | null
           creado_en?: string | null
+          sesion_caja_id?: string | null
+          categoria_id?: string | null
+          gasto_id?: string | null
+          metodo_pago?: string | null
         }
         Update: {
           id?: string
@@ -289,6 +438,10 @@ export type Database = {
           fecha?: string
           notas?: string | null
           creado_en?: string | null
+          sesion_caja_id?: string | null
+          categoria_id?: string | null
+          gasto_id?: string | null
+          metodo_pago?: string | null
         }
         Relationships: [
           {
@@ -465,6 +618,7 @@ export type Database = {
           creado_en: string | null
           metodo_pago: string
           cuenta_destino: string | null
+          monto: number
         }
         Insert: {
           id?: string
@@ -476,6 +630,7 @@ export type Database = {
           creado_en?: string | null
           metodo_pago?: string
           cuenta_destino?: string | null
+          monto?: number
         }
         Update: {
           id?: string
@@ -487,6 +642,7 @@ export type Database = {
           creado_en?: string | null
           metodo_pago?: string
           cuenta_destino?: string | null
+          monto?: number
         }
         Relationships: [
           {
@@ -497,6 +653,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cuentas_transferencia: {
+        Row: {
+          id: string
+          nombre: string
+          descripcion: string | null
+          activa: boolean
+          orden: number
+          creado_en: string | null
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          descripcion?: string | null
+          activa?: boolean
+          orden?: number
+          creado_en?: string | null
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          descripcion?: string | null
+          activa?: boolean
+          orden?: number
+          creado_en?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -649,6 +832,10 @@ export type MensajePlantilla = Database['public']['Tables']['mensaje_plantillas'
 export type MensajeEnviado = Database['public']['Tables']['mensajes_enviados']['Row']
 export type TallerPractica = Database['public']['Tables']['talleres_practica']['Row']
 export type MovimientoCaja = Database['public']['Tables']['movimientos_caja']['Row']
+export type SesionCaja = Database['public']['Tables']['sesiones_caja']['Row']
+export type CategoriaGasto = Database['public']['Tables']['categorias_gasto']['Row']
+export type Gasto = Database['public']['Tables']['gastos']['Row']
+export type CuentaTransferencia = Database['public']['Tables']['cuentas_transferencia']['Row']
 
 export type InscripcionConDetalles = Inscripcion & {
   alumnos: Alumno

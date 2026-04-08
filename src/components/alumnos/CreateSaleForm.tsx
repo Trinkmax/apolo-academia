@@ -37,6 +37,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { MessageCircle, Check, UserPlus, Loader2 } from 'lucide-react'
+import { MetodoPagoSelector } from '@/components/shared/MetodoPagoSelector'
+import { registrarMovimientoCaja } from '@/lib/caja-utils'
 
 const formSchema = z.object({
   nombre_completo: z.string().min(2, 'Obligatorio'),
@@ -49,6 +51,8 @@ const formSchema = z.object({
 export function CreateSaleForm({ cursos }: { cursos: Curso[] }) {
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [senaMetodo, setSenaMetodo] = useState('efectivo')
+  const [senaCuentaId, setSenaCuentaId] = useState('')
   const [saleComplete, setSaleComplete] = useState<{
     telefono: string;
     nombre: string;
@@ -129,6 +133,17 @@ export function CreateSaleForm({ cursos }: { cursos: Curso[] }) {
 
       // Si pago seña, registrar pago + movimiento de caja
       if (pagoSena) {
+        // Get cuenta nombre for cuenta_destino field
+        let cuentaNombre: string | null = null
+        if (senaMetodo === 'transferencia' && senaCuentaId) {
+          const { data: cuentaData } = await supabase
+            .from('cuentas_transferencia')
+            .select('nombre')
+            .eq('id', senaCuentaId)
+            .single()
+          cuentaNombre = cuentaData?.nombre || null
+        }
+
         const { data: pago, error: pagoErr } = await supabase
           .from('pagos')
           .insert([{
@@ -136,15 +151,16 @@ export function CreateSaleForm({ cursos }: { cursos: Curso[] }) {
             monto: values.monto_sena,
             tipo: 'SEÑA',
             fecha_pago: new Date().toISOString().split('T')[0],
+            metodo_pago: senaMetodo,
+            cuenta_destino: cuentaNombre,
           }])
           .select('id')
           .single()
 
         if (pagoErr) throw pagoErr
 
-        // Registrar movimiento de caja (reporte)
         const curso = cursos.find(c => c.id === values.curso_id)
-        await supabase.from('movimientos_caja').insert([{
+        await registrarMovimientoCaja(supabase, {
           tipo: 'INGRESO',
           concepto: `Seña inscripcion - ${values.nombre_completo} - ${curso?.nombre}`,
           monto: values.monto_sena,
@@ -152,7 +168,8 @@ export function CreateSaleForm({ cursos }: { cursos: Curso[] }) {
           curso_id: values.curso_id,
           inscripcion_id: inscripcion.id,
           pago_id: pago.id,
-        }])
+          metodo_pago: senaMetodo,
+        })
       }
 
       const curso = cursos.find(c => c.id === values.curso_id)
@@ -168,6 +185,8 @@ export function CreateSaleForm({ cursos }: { cursos: Curso[] }) {
       }
 
       form.reset({ nombre_completo: '', telefono: '', curso_id: '', monto_pactado: 85000, monto_sena: 0 })
+      setSenaMetodo('efectivo')
+      setSenaCuentaId('')
       setSaleComplete({
         telefono: values.telefono,
         nombre: values.nombre_completo,
@@ -325,6 +344,18 @@ export function CreateSaleForm({ cursos }: { cursos: Curso[] }) {
                     </FormItem>
                   )}
                 />
+
+                {montoSena > 0 && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Metodo de pago de la seña</label>
+                    <MetodoPagoSelector
+                      metodo={senaMetodo}
+                      onMetodoChange={setSenaMetodo}
+                      cuentaId={senaCuentaId}
+                      onCuentaChange={setSenaCuentaId}
+                    />
+                  </div>
+                )}
 
                 <DialogFooter className="pt-3">
                   <Button type="submit" disabled={submitting} className="w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm shadow-lg shadow-primary/15 disabled:opacity-40">

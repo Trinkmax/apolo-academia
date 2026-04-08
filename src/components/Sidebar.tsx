@@ -11,10 +11,12 @@ import {
   Wallet,
   Bell,
   Scissors,
+  Landmark,
   ChevronRight,
   LogOut,
   Menu,
   X,
+  Settings,
 } from 'lucide-react'
 import { logout } from '@/app/(login)/login/actions'
 
@@ -24,7 +26,9 @@ const navItems = [
   { href: '/alumnos', label: 'Alumnos', icon: Users, description: 'Inscripciones' },
   { href: '/talleres', label: 'Talleres', icon: Scissors, description: 'Practica y pagos' },
   { href: '/tesoreria', label: 'Tesoreria', icon: Wallet, description: 'Cobros y pagos' },
+  { href: '/caja', label: 'Caja', icon: Landmark, description: 'Ingresos y gastos' },
   { href: '/alertas', label: 'Alertas', icon: Bell, description: 'Tareas pendientes' },
+  { href: '/configuracion', label: 'Configuracion', icon: Settings, description: 'Cuentas y ajustes' },
 ]
 
 export default function Sidebar() {

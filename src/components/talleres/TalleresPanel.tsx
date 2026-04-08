@@ -17,28 +17,15 @@ import {
   User,
   Phone,
   Filter,
-  Wallet,
-  ArrowRightLeft,
-  CreditCard,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { registrarMovimientoCaja } from '@/lib/caja-utils'
+import { MetodoPagoSelector, METODO_ICONS, METODO_LABELS } from '@/components/shared/MetodoPagoSelector'
 
 type TalleresPanelProps = {
   talleres: any[]
   alumnos: any[]
-}
-
-const METODO_ICONS: Record<string, any> = {
-  efectivo: Wallet,
-  transferencia: ArrowRightLeft,
-  tarjeta: CreditCard,
-}
-
-const METODO_LABELS: Record<string, string> = {
-  efectivo: 'Efectivo',
-  transferencia: 'Transferencia',
-  tarjeta: 'Tarjeta',
 }
 
 type FilterType = 'todos' | 'pendiente_pago' | 'pendiente_asistencia' | 'completados'
@@ -54,7 +41,8 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
   const [selectedAlumnoId, setSelectedAlumnoId] = useState('')
   const [createPagado, setCreatePagado] = useState(true)
   const [createMetodo, setCreateMetodo] = useState('efectivo')
-  const [createCuenta, setCreateCuenta] = useState('')
+  const [createCuentaId, setCreateCuentaId] = useState('')
+  const [createMonto, setCreateMonto] = useState('5000')
   const [createLoading, setCreateLoading] = useState(false)
   const [alumnoSearch, setAlumnoSearch] = useState('')
 
@@ -85,15 +73,23 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
     }
     setCreateLoading(true)
     try {
+      const montoTaller = Number(createMonto) || 5000
+
+      // Resolve cuenta name
+      let cuentaNombre: string | null = null
+      if (createPagado && createMetodo === 'transferencia' && createCuentaId) {
+        const { data: cuentaData } = await supabase.from('cuentas_transferencia').select('nombre').eq('id', createCuentaId).single()
+        cuentaNombre = cuentaData?.nombre || null
+      }
+
       const insertData: any = {
         alumno_id: selectedAlumnoId,
         pagado: createPagado,
         asistio: false,
         fecha: new Date().toISOString().split('T')[0],
         metodo_pago: createPagado ? createMetodo : 'efectivo',
-      }
-      if (createPagado && createMetodo === 'transferencia' && createCuenta.trim()) {
-        insertData.cuenta_destino = createCuenta.trim()
+        monto: montoTaller,
+        cuenta_destino: cuentaNombre,
       }
       const { data, error } = await supabase.from('talleres_practica').insert(insertData).select('*, alumnos(id, nombre_completo, telefono, talleres_realizados)').single()
 
@@ -102,8 +98,21 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
       if (data) {
         setTalleres(prev => [data, ...prev])
         toast.success('Taller creado')
+
+        // Registrar movimiento en caja si pagado
+        if (createPagado) {
+          await registrarMovimientoCaja(supabase, {
+            tipo: 'INGRESO',
+            concepto: `Taller practica - ${data.alumnos?.nombre_completo || 'Alumno'}`,
+            monto: montoTaller,
+            alumno_id: selectedAlumnoId,
+            metodo_pago: createMetodo,
+          })
+        }
+
         setSelectedAlumnoId('')
         setAlumnoSearch('')
+        setCreateMonto('5000')
         setShowCreateForm(false)
       }
       router.refresh()
@@ -115,12 +124,32 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
   }
 
   async function togglePagado(tallerId: string, current: boolean) {
+    const taller = talleres.find(t => t.id === tallerId)
     const { error } = await supabase.from('talleres_practica').update({ pagado: !current }).eq('id', tallerId)
     if (error) {
       toast.error('Error', { description: error.message })
       return
     }
     setTalleres(prev => prev.map(t => t.id === tallerId ? { ...t, pagado: !current } : t))
+
+    // Register caja movement when marking as paid
+    if (!current && taller) {
+      const { data: sesionAbierta } = await supabase
+        .from('sesiones_caja')
+        .select('id')
+        .eq('estado', 'ABIERTA')
+        .maybeSingle()
+
+      await supabase.from('movimientos_caja').insert([{
+        tipo: 'INGRESO',
+        concepto: `Taller practica - ${taller.alumnos?.nombre_completo || 'Alumno'}`,
+        monto: taller.monto || 5000,
+        alumno_id: taller.alumno_id,
+        sesion_caja_id: sesionAbierta?.id || null,
+        metodo_pago: taller.metodo_pago || 'efectivo',
+      }])
+    }
+
     router.refresh()
   }
 
@@ -245,6 +274,18 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
             )}
           </div>
 
+          {/* Monto */}
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Monto ($)</label>
+            <Input
+              type="number"
+              value={createMonto}
+              onChange={e => setCreateMonto(e.target.value)}
+              placeholder="5000"
+              className="h-9 text-sm tabular-nums"
+            />
+          </div>
+
           {/* Estado del taller */}
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1.5">Estado de pago</label>
@@ -288,39 +329,12 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
           {createPagado && (
             <div>
               <label className="text-xs font-medium text-muted-foreground block mb-1.5">Metodo de pago</label>
-              <div className="flex gap-1">
-                {(['efectivo', 'transferencia', 'tarjeta'] as const).map(m => {
-                  const Icon = METODO_ICONS[m]
-                  const isActive = createMetodo === m
-                  return (
-                    <button
-                      key={m}
-                      onClick={() => setCreateMetodo(m)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-medium transition-all"
-                      style={isActive ? {
-                        background: 'hsl(var(--primary) / 0.1)',
-                        borderColor: 'hsl(var(--primary) / 0.3)',
-                        color: 'hsl(var(--primary))',
-                      } : {
-                        background: 'transparent',
-                        borderColor: 'hsl(var(--border) / 0.3)',
-                        color: 'hsl(var(--muted-foreground))',
-                      }}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      {METODO_LABELS[m]}
-                    </button>
-                  )
-                })}
-              </div>
-              {createMetodo === 'transferencia' && (
-                <Input
-                  value={createCuenta}
-                  onChange={e => setCreateCuenta(e.target.value)}
-                  placeholder="Cuenta destino (ej: Mercado Pago, CBU...)"
-                  className="h-9 text-sm mt-2"
-                />
-              )}
+              <MetodoPagoSelector
+                metodo={createMetodo}
+                onMetodoChange={setCreateMetodo}
+                cuentaId={createCuentaId}
+                onCuentaChange={setCreateCuentaId}
+              />
             </div>
           )}
 
@@ -359,6 +373,7 @@ export function TalleresPanel({ talleres: initialTalleres, alumnos }: TalleresPa
                 <p className="text-sm font-semibold truncate">{t.alumnos?.nombre_completo || 'Alumno'}</p>
                 <p className="text-[10px] text-muted-foreground flex items-center gap-2">
                   <span>{format(new Date(t.fecha + 'T12:00:00'), "d MMM yyyy", { locale: es })}</span>
+                  <span className="font-semibold tabular-nums">${Number(t.monto || 5000).toLocaleString('es-AR')}</span>
                   {t.alumnos?.telefono && (
                     <span className="flex items-center gap-0.5">
                       <Phone className="w-2.5 h-2.5" /> {t.alumnos.telefono}

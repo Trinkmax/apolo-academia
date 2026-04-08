@@ -36,6 +36,8 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { registrarMovimientoCaja } from '@/lib/caja-utils'
+import { MetodoPagoSelector } from '@/components/shared/MetodoPagoSelector'
 
 type AlumnoProfileDialogProps = {
   open: boolean
@@ -89,7 +91,7 @@ export function AlumnoProfileDialog({
   const [showPayForm, setShowPayForm] = useState(false)
   const [payMonto, setPayMonto] = useState('')
   const [payMetodo, setPayMetodo] = useState('efectivo')
-  const [payCuenta, setPayCuenta] = useState('')
+  const [payCuentaId, setPayCuentaId] = useState('')
   const [payLoading, setPayLoading] = useState(false)
 
   // Taller form
@@ -98,11 +100,12 @@ export function AlumnoProfileDialog({
   const [tallerCount, setTallerCount] = useState(1)
   const [tallerPagado, setTallerPagado] = useState(true)
   const [tallerMetodo, setTallerMetodo] = useState('efectivo')
-  const [tallerCuenta, setTallerCuenta] = useState('')
+  const [tallerCuentaId, setTallerCuentaId] = useState('')
+  const [tallerMonto, setTallerMonto] = useState('5000')
   // For inline payment method selection when toggling a taller to paid
   const [payingTallerId, setPayingTallerId] = useState<string | null>(null)
   const [payingTallerMetodo, setPayingTallerMetodo] = useState('efectivo')
-  const [payingTallerCuenta, setPayingTallerCuenta] = useState('')
+  const [payingTallerCuentaId, setPayingTallerCuentaId] = useState('')
 
   // Asistencia toggle loading
   const [asisLoading, setAsisLoading] = useState<string | null>(null)
@@ -150,15 +153,23 @@ export function AlumnoProfileDialog({
   }
 
   // --- ASISTENCIA ---
+  // Toggle: gris (sin registro) → verde (presente) → rojo (ausente) → gris (elimina registro)
   async function toggleAsistencia(fecha: string) {
     setAsisLoading(fecha)
     try {
       const existing = asistencias.find(a => a.fecha_clase === fecha)
       if (existing) {
-        const newPresente = !existing.presente
-        await supabase.from('asistencias').update({ presente: newPresente }).eq('id', existing.id)
-        setAsistencias(prev => prev.map(a => a.id === existing.id ? { ...a, presente: newPresente } : a))
+        if (existing.presente) {
+          // presente → ausente
+          await supabase.from('asistencias').update({ presente: false }).eq('id', existing.id)
+          setAsistencias(prev => prev.map(a => a.id === existing.id ? { ...a, presente: false } : a))
+        } else {
+          // ausente → gris (eliminar registro)
+          await supabase.from('asistencias').delete().eq('id', existing.id)
+          setAsistencias(prev => prev.filter(a => a.id !== existing.id))
+        }
       } else {
+        // gris → presente
         const { data, error } = await supabase.from('asistencias')
           .insert({ inscripcion_id: inscripcionId, fecha_clase: fecha, presente: true })
           .select()
@@ -189,21 +200,40 @@ export function AlumnoProfileDialog({
     }
     setPayLoading(true)
     try {
+      // Resolve cuenta name
+      let cuentaNombre: string | null = null
+      if (payMetodo === 'transferencia' && payCuentaId) {
+        const { data: cuentaData } = await supabase.from('cuentas_transferencia').select('nombre').eq('id', payCuentaId).single()
+        cuentaNombre = cuentaData?.nombre || null
+      }
+
       const insertData: any = {
         inscripcion_id: inscripcionId,
         monto,
         tipo: 'CUOTA',
         fecha_pago: new Date().toISOString().split('T')[0],
         metodo_pago: payMetodo,
-      }
-      if (payMetodo === 'transferencia' && payCuenta.trim()) {
-        insertData.cuenta_destino = payCuenta.trim()
+        cuenta_destino: cuentaNombre,
       }
 
       const { data: pago, error } = await supabase.from('pagos').insert(insertData).select().single()
       if (error) throw error
 
-      if (pago) setPagos(prev => [pago, ...prev])
+      if (pago) {
+        setPagos(prev => [pago, ...prev])
+
+        // Registrar movimiento en caja
+        await registrarMovimientoCaja(supabase, {
+          tipo: 'INGRESO',
+          concepto: `Cuota/Parcial - ${alumnoNombre} - ${cursoNombre}`,
+          monto,
+          alumno_id: alumnoId,
+          curso_id: cursoId,
+          inscripcion_id: inscripcionId,
+          pago_id: pago.id,
+          metodo_pago: payMetodo,
+        })
+      }
 
       const nuevoTotal = pagos.reduce((s, p) => s + Number(p.monto), 0) + monto
       await recalcularEstadoPago(nuevoTotal)
@@ -211,7 +241,7 @@ export function AlumnoProfileDialog({
       toast.success(`Pago de $${monto.toLocaleString('es-AR')} registrado`)
       setPayMonto('')
       setPayMetodo('efectivo')
-      setPayCuenta('')
+      setPayCuentaId('')
       setShowPayForm(false)
       router.refresh()
     } catch (err: any) {
@@ -237,13 +267,23 @@ export function AlumnoProfileDialog({
     if (tallerCount < 1) return
     setTallerLoading(true)
     try {
+      const montoTaller = Number(tallerMonto) || 5000
+
+      // Resolve cuenta name
+      let cuentaNombre: string | null = null
+      if (tallerPagado && tallerMetodo === 'transferencia' && tallerCuentaId) {
+        const { data: cuentaData } = await supabase.from('cuentas_transferencia').select('nombre').eq('id', tallerCuentaId).single()
+        cuentaNombre = cuentaData?.nombre || null
+      }
+
       const rows = Array.from({ length: tallerCount }, () => ({
         alumno_id: alumnoId,
         pagado: tallerPagado,
         asistio: false,
         fecha: new Date().toISOString().split('T')[0],
         metodo_pago: tallerPagado ? tallerMetodo : 'efectivo',
-        cuenta_destino: tallerPagado && tallerMetodo === 'transferencia' && tallerCuenta.trim() ? tallerCuenta.trim() : null,
+        cuenta_destino: cuentaNombre,
+        monto: montoTaller,
       }))
 
       const { data, error } = await supabase.from('talleres_practica').insert(rows).select()
@@ -252,11 +292,25 @@ export function AlumnoProfileDialog({
       if (data) {
         setTalleres(prev => [...prev, ...data])
         toast.success(`${tallerCount} taller${tallerCount > 1 ? 'es' : ''} agregado${tallerCount > 1 ? 's' : ''}`)
+
+        // Registrar movimientos en caja si pagado
+        if (tallerPagado) {
+          for (const t of data) {
+            await registrarMovimientoCaja(supabase, {
+              tipo: 'INGRESO',
+              concepto: `Taller practica - ${alumnoNombre}`,
+              monto: montoTaller,
+              alumno_id: alumnoId,
+              metodo_pago: tallerMetodo,
+            })
+          }
+        }
       }
       setTallerCount(1)
       setTallerPagado(true)
       setTallerMetodo('efectivo')
-      setTallerCuenta('')
+      setTallerCuentaId('')
+      setTallerMonto('5000')
       setShowTallerForm(false)
       router.refresh()
     } catch (err: any) {
@@ -299,27 +353,44 @@ export function AlumnoProfileDialog({
       // Toggling to paid - show payment method selector
       setPayingTallerId(tallerId)
       setPayingTallerMetodo('efectivo')
-      setPayingTallerCuenta('')
+      setPayingTallerCuentaId('')
     }
   }
 
   async function confirmarPagoTaller() {
     if (!payingTallerId) return
+
+    // Resolve cuenta name
+    let cuentaNombre: string | null = null
+    if (payingTallerMetodo === 'transferencia' && payingTallerCuentaId) {
+      const { data: cuentaData } = await supabase.from('cuentas_transferencia').select('nombre').eq('id', payingTallerCuentaId).single()
+      cuentaNombre = cuentaData?.nombre || null
+    }
+
     const updateData: any = {
       pagado: true,
       metodo_pago: payingTallerMetodo,
-    }
-    if (payingTallerMetodo === 'transferencia' && payingTallerCuenta.trim()) {
-      updateData.cuenta_destino = payingTallerCuenta.trim()
-    } else {
-      updateData.cuenta_destino = null
+      cuenta_destino: cuentaNombre,
     }
     const { error } = await supabase.from('talleres_practica').update(updateData).eq('id', payingTallerId)
     if (error) {
       toast.error('Error al actualizar pago', { description: error.message })
       return
     }
+    const taller = talleres.find(t => t.id === payingTallerId)
     setTalleres(prev => prev.map(t => t.id === payingTallerId ? { ...t, ...updateData } : t))
+
+    // Registrar movimiento en caja
+    if (taller) {
+      await registrarMovimientoCaja(supabase, {
+        tipo: 'INGRESO',
+        concepto: `Taller practica - ${alumnoNombre}`,
+        monto: taller.monto || 5000,
+        alumno_id: alumnoId,
+        metodo_pago: payingTallerMetodo,
+      })
+    }
+
     setPayingTallerId(null)
     router.refresh()
   }
@@ -627,41 +698,13 @@ export function AlumnoProfileDialog({
                   </div>
 
                   {/* Metodo de pago */}
-                  <div className="flex gap-1">
-                    {(['efectivo', 'transferencia', 'tarjeta'] as const).map(m => {
-                      const Icon = METODO_ICONS[m]
-                      const isActive = payMetodo === m
-                      return (
-                        <button
-                          key={m}
-                          onClick={() => setPayMetodo(m)}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[10px] font-medium transition-all"
-                          style={isActive ? {
-                            background: 'hsl(var(--primary) / 0.1)',
-                            borderColor: 'hsl(var(--primary) / 0.3)',
-                            color: 'hsl(var(--primary))',
-                          } : {
-                            background: 'transparent',
-                            borderColor: 'hsl(var(--border) / 0.3)',
-                            color: 'hsl(var(--muted-foreground))',
-                          }}
-                        >
-                          <Icon className="w-3 h-3" />
-                          {METODO_LABELS[m]}
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {/* Cuenta destino for transferencia */}
-                  {payMetodo === 'transferencia' && (
-                    <Input
-                      value={payCuenta}
-                      onChange={e => setPayCuenta(e.target.value)}
-                      placeholder="Cuenta destino (ej: Mercado Pago, CBU...)"
-                      className="bg-input/30 h-8 text-xs"
-                    />
-                  )}
+                  <MetodoPagoSelector
+                    metodo={payMetodo}
+                    onMetodoChange={setPayMetodo}
+                    cuentaId={payCuentaId}
+                    onCuentaChange={setPayCuentaId}
+                    size="sm"
+                  />
 
                   <Button
                     onClick={handlePago}
@@ -785,43 +828,27 @@ export function AlumnoProfileDialog({
                     </button>
                   </div>
 
+                  {/* Monto */}
+                  <div>
+                    <span className="text-[10px] font-medium text-muted-foreground">Monto ($)</span>
+                    <Input
+                      type="number"
+                      value={tallerMonto}
+                      onChange={e => setTallerMonto(e.target.value)}
+                      placeholder="5000"
+                      className="bg-input/30 h-8 text-xs tabular-nums mt-1"
+                    />
+                  </div>
+
                   {/* Payment method - only when pagado */}
                   {tallerPagado && (
-                    <>
-                      <div className="flex gap-1">
-                        {(['efectivo', 'transferencia', 'tarjeta'] as const).map(m => {
-                          const Icon = METODO_ICONS[m]
-                          const isActive = tallerMetodo === m
-                          return (
-                            <button
-                              key={m}
-                              onClick={() => setTallerMetodo(m)}
-                              className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border text-[10px] font-medium transition-all"
-                              style={isActive ? {
-                                background: 'hsl(var(--primary) / 0.1)',
-                                borderColor: 'hsl(var(--primary) / 0.3)',
-                                color: 'hsl(var(--primary))',
-                              } : {
-                                background: 'transparent',
-                                borderColor: 'hsl(var(--border) / 0.3)',
-                                color: 'hsl(var(--muted-foreground))',
-                              }}
-                            >
-                              <Icon className="w-3 h-3" />
-                              {METODO_LABELS[m]}
-                            </button>
-                          )
-                        })}
-                      </div>
-                      {tallerMetodo === 'transferencia' && (
-                        <Input
-                          value={tallerCuenta}
-                          onChange={e => setTallerCuenta(e.target.value)}
-                          placeholder="Cuenta destino (ej: Mercado Pago, CBU...)"
-                          className="bg-input/30 h-8 text-xs"
-                        />
-                      )}
-                    </>
+                    <MetodoPagoSelector
+                      metodo={tallerMetodo}
+                      onMetodoChange={setTallerMetodo}
+                      cuentaId={tallerCuentaId}
+                      onCuentaChange={setTallerCuentaId}
+                      size="sm"
+                    />
                   )}
 
                   <Button
@@ -853,6 +880,11 @@ export function AlumnoProfileDialog({
                               {format(new Date(t.fecha + 'T12:00:00'), 'd MMM', { locale: es })}
                             </span>
                           </div>
+
+                          {/* Monto */}
+                          <span className="text-[10px] font-semibold tabular-nums" style={{ color: 'hsl(var(--foreground) / 0.7)' }}>
+                            ${Number(t.monto || 5000).toLocaleString('es-AR')}
+                          </span>
 
                           <div className="flex-1" />
 
@@ -907,39 +939,13 @@ export function AlumnoProfileDialog({
                         {isPayingThis && (
                           <div className="ml-4 mt-1 mb-1 p-2 rounded-lg border space-y-1.5" style={{ borderColor: 'hsl(var(--primary) / 0.2)', background: 'hsl(var(--primary) / 0.03)' }}>
                             <span className="text-[9px] font-semibold text-muted-foreground">Metodo de pago:</span>
-                            <div className="flex gap-1">
-                              {(['efectivo', 'transferencia', 'tarjeta'] as const).map(m => {
-                                const Icon = METODO_ICONS[m]
-                                const isActive = payingTallerMetodo === m
-                                return (
-                                  <button
-                                    key={m}
-                                    onClick={() => setPayingTallerMetodo(m)}
-                                    className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md border text-[9px] font-medium transition-all"
-                                    style={isActive ? {
-                                      background: 'hsl(var(--primary) / 0.1)',
-                                      borderColor: 'hsl(var(--primary) / 0.3)',
-                                      color: 'hsl(var(--primary))',
-                                    } : {
-                                      background: 'transparent',
-                                      borderColor: 'hsl(var(--border) / 0.3)',
-                                      color: 'hsl(var(--muted-foreground))',
-                                    }}
-                                  >
-                                    <Icon className="w-2.5 h-2.5" />
-                                    {METODO_LABELS[m]}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                            {payingTallerMetodo === 'transferencia' && (
-                              <Input
-                                value={payingTallerCuenta}
-                                onChange={e => setPayingTallerCuenta(e.target.value)}
-                                placeholder="Cuenta destino"
-                                className="bg-input/30 h-7 text-[10px]"
-                              />
-                            )}
+                            <MetodoPagoSelector
+                              metodo={payingTallerMetodo}
+                              onMetodoChange={setPayingTallerMetodo}
+                              cuentaId={payingTallerCuentaId}
+                              onCuentaChange={setPayingTallerCuentaId}
+                              size="sm"
+                            />
                             <div className="flex gap-1">
                               <Button
                                 onClick={confirmarPagoTaller}

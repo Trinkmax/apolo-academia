@@ -17,12 +17,15 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DollarSign, Loader2, Banknote } from 'lucide-react'
+import { MetodoPagoSelector } from '@/components/shared/MetodoPagoSelector'
 
 export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado, alumnoId, cursoId, alumnoNombre, cursoNombre }: { inscripcionId: string, montoPactado: number, totalAbonado: number, alumnoId?: string, cursoId?: string, alumnoNombre?: string, cursoNombre?: string }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [monto, setMonto] = useState<string>('')
   const [tipo, setTipo] = useState<string>('CUOTA')
+  const [metodo, setMetodo] = useState('efectivo')
+  const [cuentaId, setCuentaId] = useState('')
   const supabase = createClient()
   const router = useRouter()
 
@@ -38,13 +41,26 @@ export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado, alum
 
     setLoading(true)
     try {
+      // Get cuenta nombre if transferencia
+      let cuentaNombre: string | null = null
+      if (metodo === 'transferencia' && cuentaId) {
+        const { data: cuentaData } = await supabase
+          .from('cuentas_transferencia')
+          .select('nombre')
+          .eq('id', cuentaId)
+          .single()
+        cuentaNombre = cuentaData?.nombre || null
+      }
+
       const { data: pago, error: pagoErr } = await supabase
         .from('pagos')
         .insert([{
           inscripcion_id: inscripcionId,
           monto: Number(monto),
           tipo: tipo,
-          fecha_pago: new Date().toISOString().split('T')[0]
+          fecha_pago: new Date().toISOString().split('T')[0],
+          metodo_pago: metodo,
+          cuenta_destino: cuentaNombre,
         }])
         .select('id')
         .single()
@@ -52,6 +68,12 @@ export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado, alum
       if (pagoErr) throw pagoErr
 
       // Registrar movimiento de caja (reporte)
+      const { data: sesionAbierta } = await supabase
+        .from('sesiones_caja')
+        .select('id')
+        .eq('estado', 'ABIERTA')
+        .maybeSingle()
+
       const conceptoTipo = tipo === 'SEÑA' ? 'Seña' : tipo === 'TOTAL' ? 'Pago completo' : 'Cuota/Parcial'
       await supabase.from('movimientos_caja').insert([{
         tipo: 'INGRESO',
@@ -61,6 +83,8 @@ export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado, alum
         curso_id: cursoId || null,
         inscripcion_id: inscripcionId,
         pago_id: pago.id,
+        sesion_caja_id: sesionAbierta?.id || null,
+        metodo_pago: metodo,
       }])
 
       const nuevoTotal = totalAbonado + Number(monto)
@@ -76,6 +100,8 @@ export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado, alum
       toast.success('Pago registrado', { description: `Nuevo estado: ${nuevoEstado}` })
       setOpen(false)
       setMonto('')
+      setMetodo('efectivo')
+      setCuentaId('')
       router.refresh()
     } catch (err: any) {
       toast.error('Error al guardar el pago', { description: err.message })
@@ -136,6 +162,16 @@ export function AddPaymentForm({ inscripcionId, montoPactado, totalAbonado, alum
                 <SelectItem value="TOTAL">Pago Completo</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Metodo de Pago</Label>
+            <MetodoPagoSelector
+              metodo={metodo}
+              onMetodoChange={setMetodo}
+              cuentaId={cuentaId}
+              onCuentaChange={setCuentaId}
+            />
           </div>
 
           <div className="flex gap-2 pt-2">

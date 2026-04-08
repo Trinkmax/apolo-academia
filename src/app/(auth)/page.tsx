@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
-import { Bell, AlertCircle, ArrowUpRight, Wallet, Users, BookOpen, CalendarClock, TrendingUp, CircleDot } from 'lucide-react'
+import { Bell, AlertCircle, ArrowUpRight, Wallet, Users, BookOpen, CalendarClock, TrendingUp, CircleDot, Landmark } from 'lucide-react'
 import { format, isToday } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -11,6 +11,17 @@ export default async function DashboardPage() {
   const { data: alertas } = await supabase.from('alertas').select('*').eq('completada', false).order('fecha_vencimiento', { ascending: true }).limit(5)
   const { data: cursos } = await supabase.from('cursos').select('id, nombre')
   const { data: inscripciones } = await supabase.from('curso_inscripciones').select('estado_pago')
+
+  // Fetch today's caja balance
+  const hoy = new Date().toISOString().split('T')[0]
+  const { data: movimientosHoy } = await supabase
+    .from('movimientos_caja')
+    .select('tipo, monto')
+    .gte('fecha', hoy)
+
+  const ingresosHoy = movimientosHoy?.filter(m => m.tipo === 'INGRESO').reduce((s, m) => s + Number(m.monto), 0) || 0
+  const egresosHoy = movimientosHoy?.filter(m => m.tipo === 'EGRESO').reduce((s, m) => s + Number(m.monto), 0) || 0
+  const balanceHoy = ingresosHoy - egresosHoy
 
   const deudoresCount = inscripciones?.filter(i => i.estado_pago === 'DEUDOR').length || 0
   const pendientesCount = inscripciones?.filter(i => i.estado_pago === 'PENDIENTE').length || 0
@@ -55,6 +66,18 @@ export default async function DashboardPage() {
       borderClass: 'border-verde/20',
       trend: `${alDiaCount} al dia`,
     },
+    {
+      label: 'Caja Hoy',
+      value: `$${balanceHoy.toLocaleString('es-AR')}`,
+      icon: Landmark,
+      href: '/caja',
+      linkText: 'Ir a caja',
+      colorClass: balanceHoy >= 0 ? 'text-primary' : 'text-rojo',
+      bgClass: balanceHoy >= 0 ? 'stat-card-primary' : 'stat-card-rojo',
+      iconBg: balanceHoy >= 0 ? 'bg-primary/10' : 'bg-rojo/10',
+      borderClass: balanceHoy >= 0 ? 'border-primary/20' : 'border-rojo/20',
+      trend: `+$${ingresosHoy.toLocaleString('es-AR')} / -$${egresosHoy.toLocaleString('es-AR')}`,
+    },
   ]
 
   return (
@@ -73,7 +96,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {stats.map((stat) => {
           const Icon = stat.icon
           return (
